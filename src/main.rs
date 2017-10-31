@@ -207,12 +207,11 @@ fn main() {
                     .expect("Error loading morgues")
             };
             if morgue.len() > 0 {
-                println!("already exists, moving on");
                 continue;
             }
         }
         let file = BufReader::new(File::open(entry.path()).unwrap());
-        let morgue = parse(file).unwrap();
+        let morgue = parse(file).expect(&format!("Failed to parse morgue {}", file_name));
         // Stash it in DB
         {
             use schema::morgues;
@@ -229,9 +228,8 @@ fn main() {
             diesel::insert(&new_morgue)
                 .into(morgues::table)
                 .execute(&connection)
-                .expect("Error saving new post");
+                .expect("Error saving new morgue");
         }
-        println!("{:?}", morgue);
     }
 }
 
