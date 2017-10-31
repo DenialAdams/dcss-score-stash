@@ -192,7 +192,7 @@ fn main() {
         Watcher::new(tx, Duration::from_secs(2)).expect("Can't set up file watcher")
     };
     // same here
-    watcher.watch("/home/brick/crawl/crawl-ref/sources/rcs", notify::RecursiveMode::Recursive).expect("Can't set up file watcher");
+    watcher.watch("/home/brick/crawl/crawl-ref/source/rcs", notify::RecursiveMode::Recursive).expect("Can't set up file watcher");
     let connection = {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
         SqliteConnection::establish(&database_url)
