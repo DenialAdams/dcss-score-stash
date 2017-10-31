@@ -31,7 +31,7 @@ struct Morgue {
 #[derive(Debug, Clone, Copy)]
 #[repr(i64)]
 enum Race {
-    Barachian = 0,
+    Barachi = 0,
     Centaur,
     DeepDwarf,
     DeepElf,
@@ -74,7 +74,7 @@ impl FromStr for Race {
     type Err = ();
     fn from_str(s: &str) -> Result<Race, ()> {
         match s {
-            "Barachian" => Ok(Race::Barachian),
+            "Barachi" => Ok(Race::Barachi),
             "Centaur" => Ok(Race::Centaur),
             "DeepDwarf" => Ok(Race::DeepDwarf),
             "DeepElf" => Ok(Race::DeepElf),
