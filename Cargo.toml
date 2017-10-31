@@ -1,0 +1,10 @@
+[package]
+name = "crawl_scoring"
+version = "0.1.0"
+authors = ["Richard McCormack <brick@brick.codes>"]
+
+[dependencies]
+walkdir = "2.0.1"
+diesel = { version = "0.16.0", features = ["sqlite"] }
+diesel_codegen = { version = "0.16.0", features = ["sqlite"] }
+dotenv = "0.10.1"
