@@ -6,6 +6,7 @@ extern crate diesel;
 extern crate diesel_codegen;
 extern crate dotenv;
 extern crate walkdir;
+extern crate notify;
 
 mod schema;
 mod models;
@@ -18,6 +19,10 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use dotenv::dotenv;
 use std::env;
+use notify::{RecommendedWatcher, Watcher};
+use std::sync::mpsc::channel;
+use std::time::Duration;
+use std::path::Path;
 
 #[derive(Debug)]
 struct Morgue {
@@ -181,54 +186,42 @@ impl FromStr for Background {
 fn main() {
     dotenv().ok();
 
+    let (tx, rx) = channel();
+    let mut watcher: RecommendedWatcher = {
+        // TODO, if this fails print an error and do one pass
+        Watcher::new(tx, Duration::from_secs(2)).expect("Can't set up file watcher")
+    };
+    // same here
+    watcher.watch("/home/brick/crawl/crawl-ref/sources/rcs", notify::RecursiveMode::Recursive).expect("Can't set up file watcher");
     let connection = {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
         SqliteConnection::establish(&database_url)
             .expect(&format!("Error connecting to {}", database_url))
     };
+    // One pass
     for entry in WalkDir::new("/home/brick/crawl/crawl-ref/source/rcs")
         .into_iter()
         .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
     {
-        let file_name = entry.file_name().to_string_lossy();
-        if !file_name.starts_with("morgue-") || !file_name.ends_with(".txt") {
-            continue;
-        }
-        // Dealing with a bonafide morgue file
-        let db_key = file_name.replace("morgue-", "").replace(".txt", "");
-        // Continue if it already exists in DB
-        {
-            let morgue = {
-                use schema::morgues::dsl::*;
-                morgues
-                    .find(&db_key)
-                    .load::<models::DbMorgue>(&connection)
-                    .expect("Error loading morgues")
-            };
-            if morgue.len() > 0 {
-                continue;
+        maybe_parse(entry.path(), &connection);
+    }
+    // Now check each file as we recv them
+    loop {
+        match rx.recv() {
+            Ok(event) => {
+                match event {
+                    notify::DebouncedEvent::Create(path) => {
+                        // Try to morgue parse it
+                        maybe_parse(&path, &connection);
+                    },
+                    _ => {
+                        continue;
+                    }
+                }
             }
-        }
-        let file = BufReader::new(File::open(entry.path()).unwrap());
-        let morgue = parse(file).expect(&format!("Failed to parse morgue {}", file_name));
-        // Stash it in DB
-        {
-            use schema::morgues;
-
-            let new_morgue = models::NewDbMorgue {
-                file_name: &db_key,
-                name: &morgue.name,
-                version: &morgue.version,
-                score: morgue.score as i64,
-                race: morgue.race as i64,
-                background: morgue.background as i64,
-            };
-
-            diesel::insert(&new_morgue)
-                .into(morgues::table)
-                .execute(&connection)
-                .expect("Error saving new morgue");
+            Err(e) => {
+                panic!(e);
+            }
         }
     }
 }
@@ -242,6 +235,56 @@ enum ParseError {
 impl From<std::io::Error> for ParseError {
     fn from(err: std::io::Error) -> ParseError {
         ParseError::Io(err)
+    }
+}
+
+fn maybe_parse(path: &Path, connection: &SqliteConnection) {
+    if !path.is_file() {
+        return;
+    }
+    let file_name = if let Some(name) = path.file_name() {
+        name
+    } else {
+        return;
+    };
+    let file_name = file_name.to_string_lossy();
+    if !file_name.starts_with("morgue-") || !file_name.ends_with(".txt") {
+        return;
+    }
+    // Dealing with a bonafide morgue file
+    let db_key = file_name.replace("morgue-", "").replace(".txt", "");
+    // Continue if it already exists in DB
+    {
+        let morgue = {
+            use schema::morgues::dsl::*;
+            morgues
+                .find(&db_key)
+                .load::<models::DbMorgue>(connection)
+                .expect("Error loading morgues")
+        };
+        if morgue.len() > 0 {
+            return;
+        }
+    }
+    let file = BufReader::new(File::open(path).unwrap());
+    let morgue = parse(file).expect(&format!("Failed to parse morgue {}", file_name));
+    // Stash it in DB
+    {
+        use schema::morgues;
+
+        let new_morgue = models::NewDbMorgue {
+            file_name: &db_key,
+            name: &morgue.name,
+            version: &morgue.version,
+            score: morgue.score as i64,
+            race: morgue.race as i64,
+            background: morgue.background as i64,
+        };
+
+        diesel::insert(&new_morgue)
+            .into(morgues::table)
+            .execute(connection)
+            .expect("Error saving new morgue");
     }
 }
 

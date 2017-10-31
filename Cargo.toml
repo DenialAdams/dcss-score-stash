@@ -8,3 +8,4 @@ walkdir = "2.0.1"
 diesel = { version = "0.16.0", features = ["sqlite"] }
 diesel_codegen = { version = "0.16.0", features = ["sqlite"] }
 dotenv = "0.10.1"
+notify = "4.0.1"
