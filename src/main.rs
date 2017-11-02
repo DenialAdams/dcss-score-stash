@@ -30,7 +30,11 @@ fn main() {
     };
 
 
-    let reader = BufReader::new(File::open("logfile19").unwrap());
+
+}
+
+fn parse_physical_log(file_name: &str, connection: &diesel::SqliteConnection) {
+    let reader = BufReader::new(File::open(file_name).unwrap());
     connection.execute("BEGIN TRANSACTION").expect("Failed to start transaction");
     for line in reader.lines().map(|l| l.expect("Failed to read lines from log file")) {
         // Annoyance: we can't just call .split(':') because place uses "::",
@@ -70,7 +74,7 @@ fn main() {
             entry.gid = format!("{}{}{}", name, "cao", start);
             {
                 use schema::games;
-                diesel::insert(&entry).into(games::table).execute(&connection).expect("Error saving new game");
+                diesel::insert(&entry).into(games::table).execute(connection).expect("Error saving new game");
             }
         } else {
             // TODO log
