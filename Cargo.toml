@@ -1,11 +1,13 @@
 [package]
-name = "crawl_scoring"
+name = "crawlstash"
 version = "0.1.0"
 authors = ["Richard McCormack <brick@brick.codes>"]
 
 [dependencies]
-walkdir = "2.0.1"
 diesel = { version = "0.16.0", features = ["sqlite"] }
 diesel_codegen = { version = "0.16.0", features = ["sqlite"] }
 dotenv = "0.10.1"
-notify = "4.0.1"
+reqwest = "0.8.0"
+
+[profile.release]
+lto = true
