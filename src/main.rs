@@ -1,5 +1,7 @@
 #![recursion_limit = "128"]
 
+extern crate flame;
+
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -163,28 +165,43 @@ fn main() {
     let mut offset = 0;
     let start_time = std::time::Instant::now();
     let mut stashed_games = 0;
+    flame::start("loop");
     loop {
-        let response: RequestResult = client.get(&format!("http://crawlapi.mooo.com/event?offset={}&limit={}&type=game", offset, LOG_CHUNK_SIZE)).send().expect("Something").json().expect("Failed to deserialize JSON");
+        flame::start("request and json");
+        flame::start("request");
+        let mut temp_response = client.get(&format!("http://crawlapi.mooo.com/event?offset={}&limit={}&type=game", offset, LOG_CHUNK_SIZE)).send().expect("Something");
+        flame::end("request");
+        flame::start("json");
+        let response: RequestResult = temp_response.json().expect("Failed to deserialize JSON");
+        flame::end("json");
+        flame::end("request and json");
         if response.results.len() == 0 {
             // Done
             break;
         }
         connection.execute("BEGIN TRANSACTION").expect("Failed to start transaction");
         for game_result in response.results.into_iter() {
+            flame::start("convert to model");
             if let Ok(game_model) = to_model(game_result.data, &game_result.src_abbr) {
                 use schema::games;
                 diesel::replace_into(games::table).values(&game_model).execute(&connection).expect("Error stashing new game");
             } else {
                 println!("Failed to parse, skipping")
             }
+            flame::end("convert to model");
         }
+        flame::start("execute end transaction");
         connection.execute("END TRANSACTION").expect("Failed to end transaction");
+        flame::end("execute end transaction");
         offset = response.next_offset;
         stashed_games += LOG_CHUNK_SIZE;
         if stashed_games % 10000 == 0 {
             println!("{} games parsed in {} secs", stashed_games, start_time.elapsed().as_secs());
+            break;
         }
     }
+    flame::end("loop");
+    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
 }
 
 

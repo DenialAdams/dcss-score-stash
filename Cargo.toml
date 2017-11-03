@@ -10,6 +10,7 @@ dotenv = "0.10.1"
 reqwest = "0.8.0"
 serde = "1.0.17"
 serde_derive = "1.0.17"
+flame = "0.2.0"
 
 [profile.release]
 lto = true
