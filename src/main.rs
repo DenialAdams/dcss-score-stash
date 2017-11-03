@@ -6,6 +6,9 @@ extern crate diesel;
 extern crate diesel_codegen;
 extern crate dotenv;
 extern crate reqwest;
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
 
 mod schema;
 mod models;
@@ -20,6 +23,133 @@ use std::env;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 use std::path::Path;
+use std::collections::HashMap;
+
+const LOG_CHUNK_SIZE: u64 = 1000;
+
+#[derive(Deserialize)]
+struct RequestResult {
+    status: u16,
+    message: String,
+    offset: u64,
+    next_offset: u64,
+    results: Vec<GameResult>
+}
+
+#[derive(Deserialize)]
+struct GameResult {
+    id: u64,
+    #[serde(rename="type")]
+    game_type: String,
+    data: GameData,
+    time: u64,
+    src_abbr: String
+}
+
+#[derive(Deserialize)]
+struct GameData {
+    v: String,
+    lv: String,
+    name: String,
+    uid: String,
+    race: String,
+    cls: String,
+    #[serde(rename="char")]
+    start_code: String,
+    xl: String,
+    sk: String,
+    sklev: String,
+    title: String,
+    place: String,
+    br: String,
+    lvl: String,
+    mhp: String,
+    mmhp: String,
+    #[serde(rename="str")]
+    strength: String,
+    int: String,
+    dex: String,
+    start: String,
+    dur: String,
+    turn: String,
+    sc: String,
+    ktyp: String,
+    killer: Option<String>,
+    kaux: Option<String>,
+    end: String,
+    tmsg: String,
+    urune: Option<String>,
+    vmsg: Option<String>,
+    potionsused: Option<String>,
+    scrollsused: Option<String>,
+    dam: Option<String>,
+    tdam: Option<String>,
+    sdam: Option<String>,
+}
+
+fn to_model(data: GameData, src_abbr: &str) -> Result<models::NewGame, std::num::ParseIntError> {
+    let dam = if let Some(dam_str) = data.dam {
+        dam_str.parse::<i64>()?
+    } else {
+        0
+    };
+    Ok(models::NewGame {
+        gid: { format!("{}{}{}", data.name, src_abbr, data.start) },
+        xl: {
+            data.xl.parse::<i64>()?
+        },
+        tmsg: data.tmsg.clone(),
+        turn: {
+            data.turn.parse::<i64>()?
+        },
+        score: {
+            data.sc.parse::<i64>()?
+        },
+        start: data.start.clone(),
+        end: data.end.clone(),
+        potions_used: {
+            if let Some(potions_used_str) = data.potionsused {
+                potions_used_str.parse::<i64>()?
+            } else {
+                -1
+            }
+        },
+        scrolls_used: {
+            if let Some(scrolls_used_str) = data.scrollsused {
+                scrolls_used_str.parse::<i64>()?
+            } else {
+                -1
+            }
+        },
+        dam: {
+            dam
+        },
+        dur: {
+            data.dur.parse::<i64>()?
+        },
+        runes: {
+            if let Some(runes_str) = data.urune {
+                runes_str.parse::<i64>()?
+            } else {
+                0
+            }
+        },
+        tdam: {
+            if let Some(tdam_str) = data.tdam {
+                tdam_str.parse::<i64>()?
+            } else {
+                dam
+            }
+        },
+        sdam: {
+            if let Some(sdam_str) = data.sdam {
+                sdam_str.parse::<i64>()?
+            } else {
+                dam
+            }
+        }
+    })
+}
 
 fn main() {
     dotenv().ok();
@@ -29,10 +159,36 @@ fn main() {
             .expect(&format!("Error connecting to {}", database_url))
     };
 
-
-
+    let client = reqwest::Client::new();
+    let mut offset = 0;
+    let start_time = std::time::Instant::now();
+    let mut stashed_games = 0;
+    loop {
+        let response: RequestResult = client.get(&format!("http://crawlapi.mooo.com/event?offset={}&limit={}&type=game", offset, LOG_CHUNK_SIZE)).send().expect("Something").json().expect("Failed to deserialize JSON");
+        if response.results.len() == 0 {
+            // Done
+            break;
+        }
+        connection.execute("BEGIN TRANSACTION").expect("Failed to start transaction");
+        for game_result in response.results.into_iter() {
+            if let Ok(game_model) = to_model(game_result.data, &game_result.src_abbr) {
+                use schema::games;
+                diesel::replace_into(games::table).values(&game_model).execute(&connection).expect("Error stashing new game");
+            } else {
+                println!("Failed to parse, skipping")
+            }
+        }
+        connection.execute("END TRANSACTION").expect("Failed to end transaction");
+        offset = response.next_offset;
+        stashed_games += LOG_CHUNK_SIZE;
+        if stashed_games % 10000 == 0 {
+            println!("{} games parsed in {} secs", stashed_games, start_time.elapsed().as_secs());
+        }
+    }
 }
 
+
+/*
 fn parse_physical_log(file_name: &str, connection: &diesel::SqliteConnection) {
     let reader = BufReader::new(File::open(file_name).unwrap());
     connection.execute("BEGIN TRANSACTION").expect("Failed to start transaction");
@@ -105,4 +261,4 @@ fn next_real_delimiter(haystack: &str) -> Option<usize> {
             return None;
         }
     }
-}
+} */
