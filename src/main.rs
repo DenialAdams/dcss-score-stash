@@ -167,17 +167,22 @@ fn main() {
     let mut offset = 0;
     let start_time = std::time::Instant::now();
     let mut stashed_games = 0;
-    let mut buf = String::with_capacity(1046528);
+    let mut buf = Vec::with_capacity(1046528);
     flame::start("loop");
     loop {
         {
             flame::start("request and json");
             flame::start("request");
-            let mut temp_response = client.get(&format!("http://crawlapi.mooo.com/event?offset={}&limit={}&type=game", offset, LOG_CHUNK_SIZE)).send().expect("Something");
+            //let mut temp_response = client.get(&format!("http://crawlapi.mooo.com/event?offset={}&limit={}&type=game", offset, LOG_CHUNK_SIZE)).send().expect("Something");
             flame::end("request");
             flame::start("json");
-            temp_response.read_to_string(&mut buf);
-            let response: RequestResult = serde_json::from_str(&buf).expect("Failed to deserialize JSON");
+            flame::start("fill buffer");
+            let mut file = std::fs::File::open("/home/brick/new_dcss/event.json").expect("Failed to open file");
+            file.read_to_end(&mut buf).expect("Failed to construct buffer");
+            flame::end("fill buffer");
+            flame::start("parse into struct");
+            let response: RequestResult = serde_json::from_slice(&buf).expect("Failed to deserialize JSON");
+            flame::end("parse into struct");
             flame::end("json");
             flame::end("request and json");
             if response.results.len() == 0 {
@@ -187,7 +192,6 @@ fn main() {
             connection.execute("BEGIN TRANSACTION").expect("Failed to start transaction");
             flame::start("convert to model");
             for game_result in response.results.into_iter() {
-                
                 if let Ok(game_model) = to_model(game_result.data, &game_result.src_abbr) {
                     use schema::games;
                     diesel::replace_into(games::table).values(&game_model).execute(&connection).expect("Error stashing new game");
@@ -203,7 +207,6 @@ fn main() {
             stashed_games += LOG_CHUNK_SIZE;
             if stashed_games % 10000 == 0 {
                 println!("{} games parsed in {} secs", stashed_games, start_time.elapsed().as_secs());
-                break;
             }
         }
         buf.clear();
