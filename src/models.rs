@@ -3,7 +3,7 @@ use super::schema::games;
 #[derive(Insertable)]
 #[table_name = "games"]
 pub struct NewGame<'a> {
-    pub gid: String,
+    pub gid: &'a str,
     pub xl: i64,
     pub tmsg: &'a str,
     pub turn: i64,
