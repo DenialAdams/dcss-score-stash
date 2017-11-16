@@ -30,6 +30,7 @@ fn main() {
 
     // Ensure enum tables are initialized
     {
+        // TODO this could be a macro
         // Species
         {
             connection
@@ -37,8 +38,26 @@ fn main() {
                 .expect("Failed to start transaction");
             for new_species in constants::SPECIES.iter() {
                 use schema::species;
-                let result = diesel::insert_into(species::table)
+                // TODO this needs to be fixed to be a conditional update
+                diesel::replace_into(species::table)
                     .values(new_species)
+                    .execute(&connection)
+                    .expect("Error saving species");
+            }
+            connection
+                .execute("END TRANSACTION")
+                .expect("Failed to end transaction");
+        }
+        // Background
+        {
+            connection
+                .execute("BEGIN TRANSACTION")
+                .expect("Failed to start transaction");
+            for new_bg in constants::BACKGROUNDS.iter() {
+                use schema::backgrounds;
+                // TODO this needs to be fixed to be a conditional update
+                diesel::replace_into(backgrounds::table)
+                    .values(new_bg)
                     .execute(&connection)
                     .expect("Error saving species");
             }
@@ -50,6 +69,8 @@ fn main() {
 
     // Build a hash table of species -> ids,
     // so that we can query without making a DB call each time
+    // TODO: maps can use FNV for minor perf gain
+    // (so minor it's probably not worth it but hey...)
     let mut species_table: HashMap<String, i32> = {
         use schema::species::dsl::{id, name, species};
         species
@@ -59,12 +80,28 @@ fn main() {
             .into_iter()
             .collect()
     };
-    // TODO: we should handle this better, instead of just discarding this information
-    // (i.e. a sub-species column?)
+
+    // TODO: table generation could be turned into macro
+    let background_table: HashMap<String, i32> = {
+        use schema::backgrounds::dsl::{id, name, backgrounds};
+        backgrounds
+            .select((name, id))
+            .load(&connection)
+            .expect("Error loading species table")
+            .into_iter()
+            .collect()
+    };
+
+    // Fixups
     {
-        let draconian_id = species_table["Draconian"];
-        for draconian_colors in ["Red", "White", "Green", "Yellow", "Grey", "Black", "Purple", "Mottled", "Pale"].iter() {
-            species_table.insert(format!("{} Draconian", draconian_colors), draconian_id);
+        // TODO: we should handle this better, instead of just discarding this information
+        // (i.e. a sub-species column?)
+        // Species Fixups
+        {
+            let draconian_id = species_table["Draconian"];
+            for draconian_colors in ["Red", "White", "Green", "Yellow", "Grey", "Black", "Purple", "Mottled", "Pale"].iter() {
+                species_table.insert(format!("{} Draconian", draconian_colors), draconian_id);
+            }
         }
     }
 
@@ -89,6 +126,7 @@ fn main() {
         let mut sdam = 0;
         let mut tdam = 0;
         let mut species = 0; // TODO REQ
+        let mut background = 0; // TODO REQ
         let mut dur = 0; // TODO REQ
         let mut runes = 0;
         let mut opt_name = None;
@@ -149,6 +187,11 @@ fn main() {
                     species = *species_table
                         .get(value)
                         .expect(&format!("Failed to get id for species {}", value));
+                },
+                "cls" => {
+                    background = *background_table
+                        .get(value)
+                        .expect(&format!("Failed to get id for background {}", value));
                 }
                 _ => { /* Unknown or unused key TODO probably log it */ }
             }
@@ -162,6 +205,7 @@ fn main() {
             let entry = models::NewGame {
                 gid: &format!("{}{}{}", name, "cao", start),
                 species_id: species,
+                background_id: background,
                 xl: xl,
                 tmsg: tmsg,
                 turn: turn,

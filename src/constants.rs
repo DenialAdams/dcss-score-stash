@@ -1,4 +1,4 @@
-use models::NewSpecies;
+use models::{NewSpecies, NewBackground};
 pub const SPECIES: [NewSpecies; 38] = [
     NewSpecies {
         short: "Ba",
@@ -189,6 +189,174 @@ pub const SPECIES: [NewSpecies; 38] = [
     NewSpecies {
         short: "Pl",
         name: "Plutonian",
+        playable: 0,
+    },
+];
+pub const BACKGROUNDS: [NewBackground; 33] = [
+    NewBackground {
+        short: "AE",
+        name: "Air Elementalist",
+        playable: 1,
+    },
+    NewBackground {
+        short: "AK",
+        name: "Abyssal Knight",
+        playable: 1,
+    },
+    NewBackground {
+        short: "AM",
+        name: "Arcane Marksman",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Ar",
+        name: "Artificer",
+        playable: 1,
+    },
+    NewBackground {
+        short: "As",
+        name: "Assassin",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Be",
+        name: "Berserker",
+        playable: 1,
+    },
+    NewBackground {
+        short: "CK",
+        name: "Chaos Knight",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Cj",
+        name: "Conjurer",
+        playable: 1,
+    },
+    NewBackground {
+        short: "EE",
+        name: "Earth Elementalist",
+        playable: 1,
+    },
+    NewBackground {
+        short: "En",
+        name: "Enchanter",
+        playable: 1,
+    },
+    NewBackground {
+        short: "FE",
+        name: "Fire Elementalist",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Fi",
+        name: "Fighter",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Gl",
+        name: "Gladiator",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Hu",
+        name: "Hunter",
+        playable: 1,
+    },
+    NewBackground {
+        short: "IE",
+        name: "Ice Elementalist",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Mo",
+        name: "Monk",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Ne",
+        name: "Necromancer",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Sk",
+        name: "Skald",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Su",
+        name: "Summoner",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Tm",
+        name: "Transmuter",
+        playable: 1,
+    },
+    NewBackground {
+        short: "VM",
+        name: "Venom Mage",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Wn",
+        name: "Wanderer",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Wr",
+        name: "Warper",
+        playable: 1,
+    },
+    NewBackground {
+        short: "Wz",
+        name: "Wizard",
+        playable: 1,
+    },
+    // non-playable
+    NewBackground {
+        short: "Cr",
+        name: "Crusader",
+        playable: 0,
+    },
+    NewBackground {
+        short: "DK",
+        name: "Death Knight",
+        playable: 0,
+    },
+    NewBackground {
+        short: "He",
+        name: "Healer",
+        playable: 0,
+    },
+    NewBackground {
+        short: "Pa",
+        name: "Paladin",
+        playable: 0,
+    },
+    NewBackground {
+        short: "Pr",
+        name: "Priest",
+        playable: 0,
+    },
+    NewBackground {
+        short: "Re",
+        name: "Reaver",
+        playable: 0,
+    },
+    NewBackground {
+        short: "St",
+        name: "Stalker",
+        playable: 0,
+    },
+    NewBackground {
+        short: "Th",
+        name: "Thief",
+        playable: 0,
+    },
+    NewBackground {
+        short: "Jr",
+        name: "Jester",
         playable: 0,
     },
 ];
