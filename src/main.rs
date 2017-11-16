@@ -1,4 +1,5 @@
-#![recursion_limit = "128"]
+#![recursion_limit = "256"]
+#![feature(custom_attribute)]
 
 #[macro_use]
 extern crate diesel;
@@ -7,6 +8,7 @@ extern crate diesel_codegen;
 extern crate dotenv;
 extern crate reqwest;
 
+mod constants;
 mod schema;
 mod models;
 
@@ -16,6 +18,7 @@ use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use dotenv::dotenv;
 use std::env;
+use std::collections::HashMap;
 
 fn main() {
     dotenv().ok();
@@ -25,10 +28,55 @@ fn main() {
             .expect(&format!("Error connecting to {}", database_url))
     };
 
+    // Ensure enum tables are initialized
+    {
+        // Species
+        {
+            connection
+                .execute("BEGIN TRANSACTION")
+                .expect("Failed to start transaction");
+            for new_species in constants::SPECIES.iter() {
+                use schema::species;
+                let result = diesel::insert_into(species::table)
+                    .values(new_species)
+                    .execute(&connection)
+                    .expect("Error saving species");
+            }
+            connection
+                .execute("END TRANSACTION")
+                .expect("Failed to end transaction");
+        }
+    }
+
+    // Build a hash table of species -> ids,
+    // so that we can query without making a DB call each time
+    let mut species_table: HashMap<String, i32> = {
+        use schema::species::dsl::{id, name, species};
+        species
+            .select((name, id))
+            .load(&connection)
+            .expect("Error loading species table")
+            .into_iter()
+            .collect()
+    };
+    // TODO: we should handle this better, instead of just discarding this information
+    // (i.e. a sub-species column?)
+    {
+        let draconian_id = species_table["Draconian"];
+        for draconian_colors in ["Red", "White", "Green", "Yellow", "Grey", "Black", "Purple", "Mottled", "Pale"].iter() {
+            species_table.insert(format!("{} Draconian", draconian_colors), draconian_id);
+        }
+    }
 
     let reader = BufReader::new(File::open("logfile").unwrap());
-    connection.execute("BEGIN TRANSACTION").expect("Failed to start transaction");
-    for line in reader.lines().map(|l| l.expect("Failed to read lines from log file")) {
+    // TODO: we should chunk transactions; there is a max size to sql statements
+    connection
+        .execute("BEGIN TRANSACTION")
+        .expect("Failed to start transaction");
+    for line in reader
+        .lines()
+        .map(|l| l.expect("Failed to read lines from log file"))
+    {
         let mut slice = line.as_ref();
 
         // Stats
@@ -40,6 +88,7 @@ fn main() {
         let mut dam = 0;
         let mut sdam = 0;
         let mut tdam = 0;
+        let mut species = 0; // TODO REQ
         let mut dur = 0; // TODO REQ
         let mut runes = 0;
         let mut opt_name = None;
@@ -56,57 +105,63 @@ fn main() {
             match key {
                 "xl" => {
                     xl = value.parse::<i64>().expect("Failed to parse xl");
-                },
+                }
                 "sc" => {
                     score = value.parse::<i64>().expect("Failed to parse score");
-                },
+                }
                 "turn" => {
                     turn = value.parse::<i64>().expect("Failed to parse turn");
                 }
                 "name" => {
                     opt_name = Some(value);
-                },
+                }
                 "start" => {
                     opt_start = Some(value);
-                },
+                }
                 "end" => {
                     opt_end = Some(value);
-                },
+                }
                 "potionsused" => {
                     potions_used = value.parse::<i64>().expect("Failed to parse potions used");
-                },
+                }
                 "scrollsused" => {
                     scrolls_used = value.parse::<i64>().expect("Failed to parse scrolls used")
-                },
+                }
                 "dam" => {
                     dam = value.parse::<i64>().expect("Failed to parse dam");
-                },
+                }
                 "tdam" => {
                     tdam = value.parse::<i64>().expect("Failed to parse tdam");
-                },
+                }
                 "sdam" => {
                     sdam = value.parse::<i64>().expect("Failed to parse sdam");
-                },
+                }
                 "tmsg" => {
                     tmsg = value;
-                },
+                }
                 "urune" => {
                     runes = value.parse::<i64>().expect("Failed to parse urune");
-                },
+                }
                 "dur" => {
                     dur = value.parse::<i64>().expect("Failed to parse dur");
+                }
+                "race" => {
+                    species = *species_table
+                        .get(value)
+                        .expect(&format!("Failed to get id for species {}", value));
                 }
                 _ => { /* Unknown or unused key TODO probably log it */ }
             }
             if index == slice.len() {
                 break;
             } else {
-                slice = &slice[index+1..];
+                slice = &slice[index + 1..];
             }
         }
         if let (Some(name), Some(start), Some(end)) = (opt_name, opt_start, opt_end) {
             let entry = models::NewGame {
                 gid: &format!("{}{}{}", name, "cao", start),
+                species_id: species,
                 xl: xl,
                 tmsg: tmsg,
                 turn: turn,
@@ -119,18 +174,23 @@ fn main() {
                 tdam: tdam,
                 sdam: sdam,
                 dur: dur,
-                runes: runes
+                runes: runes,
             };
             {
                 use schema::games;
-                diesel::replace_into(games::table).values(&entry).execute(&connection).expect("Error saving new game");
+                diesel::replace_into(games::table)
+                    .values(&entry)
+                    .execute(&connection)
+                    .expect("Error saving new game");
             }
         } else {
             // TODO log
             println!("Missing critical info, continuing");
         }
     }
-    connection.execute("END TRANSACTION").expect("Failed to end transaction");
+    connection
+        .execute("END TRANSACTION")
+        .expect("Failed to end transaction");
     println!("Parsing done");
 }
 
@@ -140,9 +200,10 @@ fn main() {
 fn next_real_delimiter(haystack: &str) -> usize {
     let mut offset = 0;
     loop {
-        let substack = &haystack[offset..]; // TODO this could slice in the middle of a char boundary and panic if a key contains fancy unicode
+        // TODO this could slice in the middle of a char boundary and panic if a key contains fancy unicode
+        let substack = &haystack[offset..];
         if let Some(index) = substack.find(':') {
-            if let Some(character) = substack.get(index+1..index+2) {
+            if let Some(character) = substack.get(index + 1..index + 2) {
                 if character == ":" {
                     // Escaped
                     offset += index + 2;

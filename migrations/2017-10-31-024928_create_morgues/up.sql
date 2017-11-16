@@ -1,5 +1,13 @@
+CREATE TABLE species (
+  id INTEGER PRIMARY KEY NOT NULL,
+  short TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL UNIQUE,
+  playable BIGINT NOT NULL
+);
+
 CREATE TABLE games (
   gid TEXT PRIMARY KEY NOT NULL,
+  species_id INTEGER NOT NULL,
   xl BIGINT NOT NULL,
   dam BIGINT NOT NULL,
   sdam BIGINT NOT NULL,
@@ -12,5 +20,6 @@ CREATE TABLE games (
   start DATETIME NOT NULL,
   end DATETIME NOT NULL,
   potions_used BIGINT NOT NULL,
-  scrolls_used BIGINT NOT NULL
-)
+  scrolls_used BIGINT NOT NULL,
+  FOREIGN KEY(species_id) REFERENCES species(id)
+);
