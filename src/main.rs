@@ -1,6 +1,7 @@
 #![recursion_limit = "256"]
 #![feature(custom_attribute)]
 
+extern crate crawl_model;
 #[macro_use]
 extern crate diesel;
 #[macro_use]
@@ -8,17 +9,12 @@ extern crate diesel_codegen;
 extern crate dotenv;
 extern crate reqwest;
 
-mod constants;
-mod schema;
-mod models;
-
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use diesel::prelude::*;
 use diesel::sqlite::SqliteConnection;
 use dotenv::dotenv;
 use std::env;
-use std::collections::HashMap;
 
 fn main() {
     dotenv().ok();
@@ -28,7 +24,7 @@ fn main() {
             .expect(&format!("Error connecting to {}", database_url))
     };
 
-    // Ensure enum tables are initialized
+    /* // Ensure enum tables are initialized
     {
         // TODO this could be a macro
         // Species
@@ -65,45 +61,8 @@ fn main() {
                 .execute("END TRANSACTION")
                 .expect("Failed to end transaction");
         }
-    }
+    } */
 
-    // Build a hash table of species -> ids,
-    // so that we can query without making a DB call each time
-    // TODO: maps can use FNV for minor perf gain
-    // (so minor it's probably not worth it but hey...)
-    let mut species_table: HashMap<String, i32> = {
-        use schema::species::dsl::{id, name, species};
-        species
-            .select((name, id))
-            .load(&connection)
-            .expect("Error loading species table")
-            .into_iter()
-            .collect()
-    };
-
-    // TODO: table generation could be turned into macro
-    let background_table: HashMap<String, i32> = {
-        use schema::backgrounds::dsl::{id, name, backgrounds};
-        backgrounds
-            .select((name, id))
-            .load(&connection)
-            .expect("Error loading species table")
-            .into_iter()
-            .collect()
-    };
-
-    // Fixups
-    {
-        // TODO: we should handle this better, instead of just discarding this information
-        // (i.e. a sub-species column?)
-        // Species Fixups
-        {
-            let draconian_id = species_table["Draconian"];
-            for draconian_colors in ["Red", "White", "Green", "Yellow", "Grey", "Black", "Purple", "Mottled", "Pale"].iter() {
-                species_table.insert(format!("{} Draconian", draconian_colors), draconian_id);
-            }
-        }
-    }
 
     let reader = BufReader::new(File::open("logfile").unwrap());
     // TODO: we should chunk transactions; there is a max size to sql statements
@@ -125,8 +84,8 @@ fn main() {
         let mut dam = 0;
         let mut sdam = 0;
         let mut tdam = 0;
-        let mut species = 0; // TODO REQ
-        let mut background = 0; // TODO REQ
+        let mut opt_species = None;
+        let mut opt_background = None;
         let mut dur = 0; // TODO REQ
         let mut runes = 0;
         let mut opt_name = None;
@@ -184,14 +143,10 @@ fn main() {
                     dur = value.parse::<i64>().expect("Failed to parse dur");
                 }
                 "race" => {
-                    species = *species_table
-                        .get(value)
-                        .expect(&format!("Failed to get id for species {}", value));
+                    opt_species = Some(value.parse::<crawl_model::data::Species>().expect(&format!("Failed to parse species {}", value)));
                 },
                 "cls" => {
-                    background = *background_table
-                        .get(value)
-                        .expect(&format!("Failed to get id for background {}", value));
+                    opt_background = Some(value.parse::<crawl_model::data::Background>().expect(&format!("Failed to parse background {}", value)));
                 }
                 _ => { /* Unknown or unused key TODO probably log it */ }
             }
@@ -201,11 +156,12 @@ fn main() {
                 slice = &slice[index + 1..];
             }
         }
-        if let (Some(name), Some(start), Some(end)) = (opt_name, opt_start, opt_end) {
-            let entry = models::NewGame {
+        if let (Some(name), Some(start), Some(end), Some(bg), Some(species)) = (opt_name, opt_start, opt_end, opt_background, opt_species) {
+            let entry = crawl_model::db_model::NewGame {
                 gid: &format!("{}{}{}", name, "cao", start),
-                species_id: species,
-                background_id: background,
+                name: name,
+                species_id: species as i64,
+                background_id: bg as i64,
                 xl: xl,
                 tmsg: tmsg,
                 turn: turn,
@@ -221,7 +177,7 @@ fn main() {
                 runes: runes,
             };
             {
-                use schema::games;
+                use crawl_model::db_schema::games;
                 diesel::replace_into(games::table)
                     .values(&entry)
                     .execute(&connection)

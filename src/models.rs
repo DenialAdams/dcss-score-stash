@@ -1,14 +1,13 @@
 use super::schema::games;
-use super::schema::species;
-use super::schema::backgrounds;
+//use super::schema::species;
+//use super::schema::backgrounds;
 
 #[derive(Insertable)]
 #[table_name = "games"]
-#[belongs_to(Species, Background)]
 pub struct NewGame<'a> {
     pub gid: &'a str,
-    pub species_id: i32,
-    pub background_id: i32,
+    pub species_id: i64,
+    pub background_id: i64,
     pub xl: i64,
     pub tmsg: &'a str,
     pub turn: i64,
@@ -24,11 +23,14 @@ pub struct NewGame<'a> {
     pub runes: i64,
 }
 
+/*
+
 #[derive(Queryable, Associations)]
+#[table_name = "games"]
 pub struct Game {
     pub gid: String,
-    pub species_id: i32,
-    pub background_id: i32,
+    pub species_id: i64,
+    pub background_id: i64,
     pub xl: i64,
     pub tmsg: String,
     pub turn: i64,
@@ -55,7 +57,7 @@ pub struct NewSpecies<'a> {
 #[derive(Identifiable, Queryable, Associations)]
 #[table_name = "species"]
 pub struct Species {
-    pub id: i32,
+    pub id: i64,
     pub short: String,
     pub name: String,
     pub playable: i64,
@@ -70,9 +72,12 @@ pub struct NewBackground<'a> {
 }
 
 #[derive(Identifiable, Queryable, Associations)]
+#[table_name = "backgrounds"]
 pub struct Background {
-    pub id: i32,
+    pub id: i64,
     pub short: String,
     pub name: String,
     pub playable: i64,
 }
+
+*/

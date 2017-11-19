@@ -4,7 +4,8 @@ version = "0.1.0"
 authors = ["Richard McCormack <brick@brick.codes>"]
 
 [dependencies]
-diesel = { git = "https://github.com/diesel-rs/diesel", features = ["sqlite"] }
+crawl_model = { git = "https://github.com/DenialAdams/crawl_model" }
+diesel = { git = "https://github.com/diesel-rs/diesel", features = ["sqlite", "large-tables"] }
 diesel_codegen = { git = "https://github.com/diesel-rs/diesel", features = ["sqlite"] }
 dotenv = "0.10.1"
 reqwest = "0.8.0"
