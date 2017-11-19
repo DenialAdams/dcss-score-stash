@@ -111,7 +111,7 @@ dependencies = [
 [[package]]
 name = "crawl_model"
 version = "0.1.0"
-source = "git+https://github.com/DenialAdams/crawl_model#701289b6cd9ab8f4c5a5c7e87c49cd65d7d02bf8"
+source = "git+https://github.com/DenialAdams/crawl_model#6097ee2f3b99951b2d2a0402b899797333208694"
 dependencies = [
  "diesel 0.16.0 (git+https://github.com/diesel-rs/diesel)",
  "diesel_codegen 0.16.0 (git+https://github.com/diesel-rs/diesel)",

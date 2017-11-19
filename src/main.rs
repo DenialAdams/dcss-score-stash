@@ -24,46 +24,6 @@ fn main() {
             .expect(&format!("Error connecting to {}", database_url))
     };
 
-    /* // Ensure enum tables are initialized
-    {
-        // TODO this could be a macro
-        // Species
-        {
-            connection
-                .execute("BEGIN TRANSACTION")
-                .expect("Failed to start transaction");
-            for new_species in constants::SPECIES.iter() {
-                use schema::species;
-                // TODO this needs to be fixed to be a conditional update
-                diesel::replace_into(species::table)
-                    .values(new_species)
-                    .execute(&connection)
-                    .expect("Error saving species");
-            }
-            connection
-                .execute("END TRANSACTION")
-                .expect("Failed to end transaction");
-        }
-        // Background
-        {
-            connection
-                .execute("BEGIN TRANSACTION")
-                .expect("Failed to start transaction");
-            for new_bg in constants::BACKGROUNDS.iter() {
-                use schema::backgrounds;
-                // TODO this needs to be fixed to be a conditional update
-                diesel::replace_into(backgrounds::table)
-                    .values(new_bg)
-                    .execute(&connection)
-                    .expect("Error saving species");
-            }
-            connection
-                .execute("END TRANSACTION")
-                .expect("Failed to end transaction");
-        }
-    } */
-
-
     let reader = BufReader::new(File::open("logfile").unwrap());
     // TODO: we should chunk transactions; there is a max size to sql statements
     connection
@@ -91,6 +51,7 @@ fn main() {
         let mut opt_name = None;
         let mut opt_start = None;
         let mut opt_end = None;
+        let mut god = crawl_model::data::God::Atheist;
         let mut tmsg = "";
 
         // TODO figure out what to do with these expects (probably log and continue)
@@ -147,6 +108,9 @@ fn main() {
                 },
                 "cls" => {
                     opt_background = Some(value.parse::<crawl_model::data::Background>().expect(&format!("Failed to parse background {}", value)));
+                },
+                "god" => {
+                    god = value.parse::<crawl_model::data::God>().expect(&format!("Failed to parse god {}", value));
                 }
                 _ => { /* Unknown or unused key TODO probably log it */ }
             }
@@ -162,6 +126,7 @@ fn main() {
                 name: name,
                 species_id: species as i64,
                 background_id: bg as i64,
+                god_id: god as i64,
                 xl: xl,
                 tmsg: tmsg,
                 turn: turn,

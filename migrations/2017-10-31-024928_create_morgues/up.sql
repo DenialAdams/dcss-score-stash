@@ -3,6 +3,7 @@ CREATE TABLE games (
   name TEXT NOT NULL,
   species_id BIGINT NOT NULL,
   background_id BIGINT NOT NULL,
+  god_id BIGINT NOT NULL,
   xl BIGINT NOT NULL,
   dam BIGINT NOT NULL,
   sdam BIGINT NOT NULL,
