@@ -24,139 +24,141 @@ fn main() {
             .expect(&format!("Error connecting to {}", database_url))
     };
 
-    let reader = BufReader::new(File::open("logfile").unwrap());
+    let mut lines = BufReader::new(File::open("logfile").unwrap()).lines().map(|l| l.expect("Failed to read lines from log file")).peekable();
     // TODO: we should chunk transactions; there is a max size to sql statements
-    connection
-        .execute("BEGIN TRANSACTION")
-        .expect("Failed to start transaction");
-    for line in reader
-        .lines()
-        .map(|l| l.expect("Failed to read lines from log file"))
-    {
-        let mut slice = line.as_ref();
+    loop {
+        connection
+            .execute("BEGIN TRANSACTION")
+            .expect("Failed to start transaction");
+        while let Some(line) = lines.next()
+        {
+            let mut slice = line.as_ref();
 
-        // Stats
-        let mut xl = 0; // TODO REQ
-        let mut score = 0; // TODO REQ
-        let mut turn = 0; // TODO REQ
-        let mut potions_used = -1;
-        let mut scrolls_used = -1;
-        let mut dam = 0;
-        let mut sdam = 0;
-        let mut tdam = 0;
-        let mut opt_species = None;
-        let mut opt_background = None;
-        let mut dur = 0; // TODO REQ
-        let mut runes = 0;
-        let mut opt_name = None;
-        let mut opt_start = None;
-        let mut opt_end = None;
-        let mut god = crawl_model::data::God::Atheist;
-        let mut tmsg = "";
+            // Stats
+            let mut xl = 0; // TODO REQ
+            let mut score = 0; // TODO REQ
+            let mut turn = 0; // TODO REQ
+            let mut potions_used = -1;
+            let mut scrolls_used = -1;
+            let mut dam = 0;
+            let mut sdam = 0;
+            let mut tdam = 0;
+            let mut opt_species = None;
+            let mut opt_background = None;
+            let mut dur = 0; // TODO REQ
+            let mut runes = 0;
+            let mut opt_name = None;
+            let mut opt_start = None;
+            let mut opt_end = None;
+            let mut god = crawl_model::data::God::Atheist;
+            let mut tmsg = "";
 
-        // TODO figure out what to do with these expects (probably log and continue)
-        loop {
-            let index = next_real_delimiter(&slice);
-            let mut iter = slice[..index].split('=');
-            let key = iter.next().expect("Corrupt data, missing key");
-            let value = iter.next().expect("Corrupt data, missing value");
-            match key {
-                "xl" => {
-                    xl = value.parse::<i64>().expect("Failed to parse xl");
+            // TODO figure out what to do with these expects (probably log and continue)
+            loop {
+                let index = next_real_delimiter(&slice);
+                let mut iter = slice[..index].split('=');
+                let key = iter.next().expect("Corrupt data, missing key");
+                let value = iter.next().expect("Corrupt data, missing value");
+                match key {
+                    "xl" => {
+                        xl = value.parse::<i64>().expect("Failed to parse xl");
+                    }
+                    "sc" => {
+                        score = value.parse::<i64>().expect("Failed to parse score");
+                    }
+                    "turn" => {
+                        turn = value.parse::<i64>().expect("Failed to parse turn");
+                    }
+                    "name" => {
+                        opt_name = Some(value);
+                    }
+                    "start" => {
+                        opt_start = Some(value);
+                    }
+                    "end" => {
+                        opt_end = Some(value);
+                    }
+                    "potionsused" => {
+                        potions_used = value.parse::<i64>().expect("Failed to parse potions used");
+                    }
+                    "scrollsused" => {
+                        scrolls_used = value.parse::<i64>().expect("Failed to parse scrolls used")
+                    }
+                    "dam" => {
+                        dam = value.parse::<i64>().expect("Failed to parse dam");
+                    }
+                    "tdam" => {
+                        tdam = value.parse::<i64>().expect("Failed to parse tdam");
+                    }
+                    "sdam" => {
+                        sdam = value.parse::<i64>().expect("Failed to parse sdam");
+                    }
+                    "tmsg" => {
+                        tmsg = value;
+                    }
+                    "urune" => {
+                        runes = value.parse::<i64>().expect("Failed to parse urune");
+                    }
+                    "dur" => {
+                        dur = value.parse::<i64>().expect("Failed to parse dur");
+                    }
+                    "race" => {
+                        opt_species = Some(value.parse::<crawl_model::data::Species>().expect(&format!("Failed to parse species {}", value)));
+                    },
+                    "cls" => {
+                        opt_background = Some(value.parse::<crawl_model::data::Background>().expect(&format!("Failed to parse background {}", value)));
+                    },
+                    "god" => {
+                        god = value.parse::<crawl_model::data::God>().expect(&format!("Failed to parse god {}", value));
+                    }
+                    _ => { /* Unknown or unused key TODO probably log it */ }
                 }
-                "sc" => {
-                    score = value.parse::<i64>().expect("Failed to parse score");
+                if index == slice.len() {
+                    break;
+                } else {
+                    slice = &slice[index + 1..];
                 }
-                "turn" => {
-                    turn = value.parse::<i64>().expect("Failed to parse turn");
-                }
-                "name" => {
-                    opt_name = Some(value);
-                }
-                "start" => {
-                    opt_start = Some(value);
-                }
-                "end" => {
-                    opt_end = Some(value);
-                }
-                "potionsused" => {
-                    potions_used = value.parse::<i64>().expect("Failed to parse potions used");
-                }
-                "scrollsused" => {
-                    scrolls_used = value.parse::<i64>().expect("Failed to parse scrolls used")
-                }
-                "dam" => {
-                    dam = value.parse::<i64>().expect("Failed to parse dam");
-                }
-                "tdam" => {
-                    tdam = value.parse::<i64>().expect("Failed to parse tdam");
-                }
-                "sdam" => {
-                    sdam = value.parse::<i64>().expect("Failed to parse sdam");
-                }
-                "tmsg" => {
-                    tmsg = value;
-                }
-                "urune" => {
-                    runes = value.parse::<i64>().expect("Failed to parse urune");
-                }
-                "dur" => {
-                    dur = value.parse::<i64>().expect("Failed to parse dur");
-                }
-                "race" => {
-                    opt_species = Some(value.parse::<crawl_model::data::Species>().expect(&format!("Failed to parse species {}", value)));
-                },
-                "cls" => {
-                    opt_background = Some(value.parse::<crawl_model::data::Background>().expect(&format!("Failed to parse background {}", value)));
-                },
-                "god" => {
-                    god = value.parse::<crawl_model::data::God>().expect(&format!("Failed to parse god {}", value));
-                }
-                _ => { /* Unknown or unused key TODO probably log it */ }
             }
-            if index == slice.len() {
-                break;
+            if let (Some(name), Some(start), Some(end), Some(bg), Some(species)) = (opt_name, opt_start, opt_end, opt_background, opt_species) {
+                let entry = crawl_model::db_model::NewGame {
+                    gid: &format!("{}{}{}", name, "cao", start),
+                    name: name,
+                    species_id: species as i64,
+                    background_id: bg as i64,
+                    god_id: god as i64,
+                    xl: xl,
+                    tmsg: tmsg,
+                    turn: turn,
+                    score: score,
+                    start: start,
+                    end: end,
+                    potions_used: potions_used,
+                    scrolls_used: scrolls_used,
+                    dam: dam,
+                    tdam: tdam,
+                    sdam: sdam,
+                    dur: dur,
+                    runes: runes,
+                };
+                {
+                    use crawl_model::db_schema::games;
+                    diesel::replace_into(games::table)
+                        .values(&entry)
+                        .execute(&connection)
+                        .expect("Error saving new game");
+                }
             } else {
-                slice = &slice[index + 1..];
+                // TODO log
+                println!("Missing critical info, continuing");
             }
         }
-        if let (Some(name), Some(start), Some(end), Some(bg), Some(species)) = (opt_name, opt_start, opt_end, opt_background, opt_species) {
-            let entry = crawl_model::db_model::NewGame {
-                gid: &format!("{}{}{}", name, "cao", start),
-                name: name,
-                species_id: species as i64,
-                background_id: bg as i64,
-                god_id: god as i64,
-                xl: xl,
-                tmsg: tmsg,
-                turn: turn,
-                score: score,
-                start: start,
-                end: end,
-                potions_used: potions_used,
-                scrolls_used: scrolls_used,
-                dam: dam,
-                tdam: tdam,
-                sdam: sdam,
-                dur: dur,
-                runes: runes,
-            };
-            {
-                use crawl_model::db_schema::games;
-                diesel::replace_into(games::table)
-                    .values(&entry)
-                    .execute(&connection)
-                    .expect("Error saving new game");
-            }
-        } else {
-            // TODO log
-            println!("Missing critical info, continuing");
+        connection
+            .execute("END TRANSACTION")
+            .expect("Failed to end transaction");
+        while let None = lines.peek() {
+            let _ = lines.next();
         }
     }
-    connection
-        .execute("END TRANSACTION")
-        .expect("Failed to end transaction");
-    println!("Parsing done");
 }
 
 // Annoyance: we can't just call .split(':') because place uses "::",
