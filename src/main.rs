@@ -30,8 +30,7 @@ fn main() {
         connection
             .execute("BEGIN TRANSACTION")
             .expect("Failed to start transaction");
-        while let Some(line) = lines.next()
-        {
+        while let Some(line) = lines.next() {
             let mut slice = line.as_ref();
 
             // Stats
@@ -156,6 +155,7 @@ fn main() {
             .execute("END TRANSACTION")
             .expect("Failed to end transaction");
         while let None = lines.peek() {
+            std::thread::sleep(std::time::Duration::from_millis(10));
             let _ = lines.next();
         }
     }
