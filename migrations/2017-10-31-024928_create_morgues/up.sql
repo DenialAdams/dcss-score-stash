@@ -13,8 +13,9 @@ CREATE TABLE games (
   dur BIGINT NOT NULL,
   runes BIGINT NOT NULL,
   score BIGINT NOT NULL,
-  start DATETIME NOT NULL,
-  end DATETIME NOT NULL,
+  start TEXT NOT NULL,
+  end TEXT NOT NULL,
   potions_used BIGINT NOT NULL,
-  scrolls_used BIGINT NOT NULL
+  scrolls_used BIGINT NOT NULL,
+  place TEXT NOT NULL
 );

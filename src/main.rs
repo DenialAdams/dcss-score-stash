@@ -4,8 +4,6 @@
 extern crate crawl_model;
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate diesel_codegen;
 extern crate dotenv;
 extern crate reqwest;
 
@@ -51,6 +49,7 @@ fn main() {
             let mut opt_end = None;
             let mut god = crawl_model::data::God::Atheist;
             let mut tmsg = "";
+            let mut place = "";
 
             // TODO figure out what to do with these expects (probably log and continue)
             loop {
@@ -109,6 +108,9 @@ fn main() {
                     },
                     "god" => {
                         god = value.parse::<crawl_model::data::God>().expect(&format!("Failed to parse god {}", value));
+                    },
+                    "place" => {
+                        place = value;
                     }
                     _ => { /* Unknown or unused key TODO probably log it */ }
                 }
@@ -138,6 +140,7 @@ fn main() {
                     sdam: sdam,
                     dur: dur,
                     runes: runes,
+                    place: place
                 };
                 {
                     use crawl_model::db_schema::games;
